@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Location de voitures</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; color: #333; }
+    h1, h2 { color: #007BFF; text-align: center; margin-bottom: 30px; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input, select { margin-top: 5px; width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+    button { margin-top: 20px; padding: 12px 20px; background-color: #007BFF; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }
+    button:hover { background-color: #0056b3; }
+    .result, .error { margin-top: 30px; padding: 20px; border-radius: 10px; background-color: #ffffff; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); }
+    .result h3 { color: #28a745; }
+    .error { color: #dc3545; font-size: 14px; }
+    .form-container { max-width: 600px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+
+  <h1>🚗 Louer une voiture</h1>
+
+  <div class="form-container">
+    <label for="userId">Utilisateur :</label>
+    <select id="userId"></select>
+
+    <label for="carId">Voiture :</label>
+    <select id="carId"></select>
+
+    <label for="startDate">Date de début :</label>
+    <input type="date" id="startDate" required />
+
+    <label for="endDate">Date de fin :</label>
+    <input type="date" id="endDate" required />
+
+    <button onclick="louerVoiture()">Louer maintenant</button>
+
+   
+   
+
+    <div class="error" id="errorMessage"></div>
+    <div class="result" id="result" style="display: none;">
+      <h3>Location créée avec succès ! 🎉</h3>
+      <p><strong>ID Location :</strong> <span id="rentalId"></span></p>
+      <p><strong>Utilisateur :</strong> <span id="userIdResult"></span></p>
+      <p><strong>Voiture :</strong> <span id="carIdResult"></span></p>
+      <p><strong>Dates :</strong> <span id="rentalDates"></span></p>
+    </div>
+  </div>
+
+  <script>
+     
+    async function chargerUtilisateurs() {
+      for (let id = 1; id <= 10; id++) {
+        try {
+          const res = await fetch(`http://localhost:8003/api/users/${id}`);
+          if (res.ok) {
+            const user = await res.json();
+            const option = document.createElement("option");
+            option.value = user.id;
+            option.textContent = `${user.name} (${user.email})`;
+            document.getElementById("userId").appendChild(option);
+          }
+        } catch {}
+      }
+    }
+
+    async function chargerVoitures() {
+      for (let id = 1; id <= 10; id++) {
+        try {
+          const res = await fetch(`http://localhost:8003/api/cars/${id}`);
+          if (res.ok) {
+            const car = await res.json();
+            if (car.available) {
+              const option = document.createElement("option");
+              option.value = car.id;
+              option.textContent = `${car.brand} ${car.model}`;
+              document.getElementById("carId").appendChild(option);
+            }
+          }
+        } catch {}
+      }
+    }
+
+    async function louerVoiture() {
+      const userId = document.getElementById("userId").value;
+      const carId = document.getElementById("carId").value;
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+
+      document.getElementById("errorMessage").textContent = '';
+      document.getElementById("result").style.display = 'none';
+
+      
+
+      if (!userId || !carId || !startDate || !endDate) {
+        document.getElementById("errorMessage").textContent = "Tous les champs doivent être remplis !";
+        return;
+      }
+
+      if (new Date(startDate) >= new Date(endDate)) {
+        document.getElementById("errorMessage").textContent = "La date de début doit être avant la date de fin !";
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:8003/api/rentals/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: parseInt(userId),
+            car_id: parseInt(carId),
+            start_date: startDate,
+            end_date: endDate
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          document.getElementById("errorMessage").textContent = errorData.detail || "Erreur inconnue lors de la création de la location.";
+          return;
+        }
+
+        const result = await response.json();
+        document.getElementById("result").style.display = 'block';
+        document.getElementById("rentalId").textContent = result.rental_id;
+        document.getElementById("userIdResult").textContent = result.user_id;
+        document.getElementById("carIdResult").textContent = result.car_id;
+        document.getElementById("rentalDates").textContent = `${startDate} à ${endDate}`;
+
+      } catch {
+        document.getElementById("errorMessage").textContent = "Erreur de communication avec le serveur.";
+      }
+    }
+
+    // Charger au démarrage
+    window.onload = () => {
+      chargerUtilisateurs();
+      chargerVoitures();
+    };
+  </script>
+
+</body>
+</html>

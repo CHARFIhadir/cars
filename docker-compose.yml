@@ -1,0 +1,165 @@
+
+
+services:
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  users_db:
+    image: postgres:17
+    container_name: users_db
+    environment:
+      POSTGRES_DB: users_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 29032002
+    ports:
+      - "5433:5432"
+    volumes:
+      - users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  cars_db:
+    image: postgres:17
+    container_name: cars_db
+    environment:
+      POSTGRES_DB: cars_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 29032002
+    ports:
+      - "5434:5432"
+    volumes:
+      - cars_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  rentals_db:
+    image: postgres:17
+    container_name: rentals_db
+    environment:
+      POSTGRES_DB: rentals_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 29032002
+    ports:
+      - "5435:5432"
+    volumes:
+      - rentals_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  users_service:
+    build:
+      context: ./users_service
+    container_name: users_service
+    depends_on:
+      users_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: users_db
+      DB_PORT: 5432
+      DB_NAME: users_db
+      DB_USER: postgres
+      DB_PASS: 29032002
+      REDIS_HOST: redis
+    networks:
+      - app-network
+
+  cars_service:
+    build:
+      context: ./cars_service
+    container_name: cars_service
+    depends_on:
+      cars_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8001:8000"
+    environment:
+      DB_HOST: cars_db
+      DB_PORT: 5432
+      DB_NAME: cars_db
+      DB_USER: postgres
+      DB_PASS: 29032002
+      REDIS_HOST: redis
+    networks:
+      - app-network
+
+  rentals_service:
+    build:
+      context: ./rentals_service
+    container_name: rentals_service
+    depends_on:
+      rentals_db:
+        condition: service_healthy
+      cars_service:
+        condition: service_started
+    ports:
+      - "8002:8000"
+    environment:
+      DB_HOST: rentals_db
+      DB_PORT: 5432
+      DB_NAME: rentals_db
+      DB_USER: postgres
+      DB_PASS: 29032002
+    networks:
+      - app-network
+
+  gateway_service:
+    build:
+      context: ./gateway_service
+    container_name: gateway_service
+    depends_on:
+      users_service:
+        condition: service_started
+      cars_service:
+        condition: service_started
+      rentals_service:
+        condition: service_started
+    ports:
+      - "8003:8000"
+    networks:
+      - app-network
+
+  frontend:
+    image: nginx:alpine
+    container_name: frontend
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+
+volumes:
+  users_data:
+  cars_data:
+  rentals_data:
+
+networks:
+  app-network:
+    driver: bridge
+    name: app-network
